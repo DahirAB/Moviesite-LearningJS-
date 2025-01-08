@@ -328,16 +328,15 @@ section h2 {
 
 /* Alert */
 .alert {
-	background: red;
 	padding: 10px 20px;
 	margin-bottom: 20px;
 	border-radius: 5px;
 }
 
-.alert-success {
-	background: green;
+.success {
+	background: green !important;
 }
 
-.alert-error {
-	background: red;
+.error {
+	background: red !important;
 }

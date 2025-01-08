@@ -1,13 +1,13 @@
 const state = {
 	curPage: window.location.pathname,
-	search: {
-		term: '',
-		type: '',
-		page: 1,
-		totalPages: 1,
-	},
+	term: '',
+	type: '',
+	page: 1,
+	totalPages: 1,
+	totalRes: 0,
 };
-function showAlert(mes, className) {
+
+function showAlert(mes, className = 'error') {
 	const alertel = document.createElement('div');
 	alertel.classList.add('alert', className);
 	alertel.appendChild(document.createTextNode(mes));
@@ -23,7 +23,6 @@ function hideSpinner() {
 }
 async function displaySwiper() {
 	const { results: nowPlayingData } = await fetchTmbdData('movie/now_playing');
-	console.log(nowPlayingData);
 
 	nowPlayingData.forEach((movie) => {
 		const div = document.createElement('div');
@@ -70,16 +69,104 @@ function initSwiper() {
 async function search() {
 	const queryString = window.location.search;
 	qStrArr = queryString.split(/[=&]+/);
-	console.log(qStrArr);
+
 	state.type = qStrArr[1];
 	state.term = qStrArr[3];
 	if (state.term !== '') {
-		const res = await searchApiData();
+		const {
+			results: searchData,
+			total_pages,
+			page,
+			total_results,
+		} = await searchApiData();
+		state.totalPages = total_pages;
+		state.page = page;
+		state.totalRes = total_results;
+		if (searchData.length === 0) {
+			showAlert('Not found');
+			return;
+		}
+		displaySearchRes(searchData);
+		document.querySelector('#search-term').value = '';
 	} else {
 		showAlert('enter term');
 	}
 }
-async function searchApiData(params) {}
+function displaySearchRes(data) {
+	console.log(state.term, state.type, state.page);
+	document.querySelector('#search-results').innerHTML = '';
+	document.querySelector('#search-results-heading').innerHTML = '';
+	document.querySelector('#pagination').innerHTML = '';
+
+	data.forEach((dataObj) => {
+		const div = document.createElement('div');
+		div.classList.add('card');
+		const title = state.type === 'movie' ? dataObj.title : dataObj.name;
+		const release_date =
+			state.type === 'movie' ? dataObj.release_date : dataObj.first_air_date;
+		const image = dataObj.poster_path
+			? `https://image.tmdb.org/t/p/w500/${dataObj.poster_path}`
+			: `images/no-image.jpg`;
+		div.innerHTML = `
+        <a href="${state.type}-details.html?id=${dataObj.id}">
+            <img
+                src="${image}"
+                class="card-img-top"
+                alt="${title}"
+            />
+        </a>
+        <div class="card-body">
+            <h5 class="card-title">${title}</h5>
+            <p class="card-text">
+                <small class="text-muted">Release: ${release_date}</small>
+            </p>
+        </div>`;
+		document.querySelector('#search-results-heading').innerHTML = `<h2>${
+			data.length * state.page
+		} of ${state.totalRes} Results of ${state.term.split('+').join('  ')}</h2>`;
+		document.querySelector('#search-results').appendChild(div);
+	});
+
+	displayPagination();
+}
+
+function displayPagination() {
+	const div = document.createElement('div');
+	div.classList.add('pagination');
+	div.innerHTML = `
+	<button class="btn btn-primary" id="prev">Prev</button>
+					<button class="btn btn-primary" id="next">Next</button>
+					<div class="page-counter">Page ${state.page} of ${state.totalPages}</div>
+					`;
+	document.querySelector('#pagination').appendChild(div);
+	if (state.page === 1) {
+		document.querySelector('#prev').disabled = true;
+	}
+	if (state.page === state.totalPages) {
+		document.querySelector('#next').disabled = true;
+	}
+	document.querySelector('#next').addEventListener('click', async () => {
+		state.page++;
+		const { results, total_pages } = await searchApiData();
+		console.log(results);
+		displaySearchRes(results);
+	});
+	document.querySelector('#prev').addEventListener('click', async () => {
+		state.page--;
+		const { results, total_pages } = await searchApiData();
+		console.log(results);
+		displaySearchRes(results);
+	});
+}
+async function searchApiData() {
+	showSpinner();
+	const res = await fetch(
+		`${API_URL}/search/${state.type}?api_key=${API_KEY}&query=${state.term}&page=${state.page}`
+	);
+	const data = await res.json();
+	hideSpinner();
+	return data;
+}
 // function initSwiper() {
 // 	const swiper = new Swiper('.swiper', {
 // 		slidesPerView: 1,
@@ -187,7 +274,7 @@ async function displayPopMovies() {
 function displayBackdrop(type, path) {
 	const overlaydiv = document.createElement('div');
 	overlaydiv.style.backgroundImage = `url(https://image.tmdb.org/t/p/original${path})`;
-	console.log(`https://image.tmdb.org/t/p/original${path}`);
+
 	overlaydiv.style.backgroundSize = 'cover';
 	overlaydiv.style.backgroundPosition = 'center';
 	overlaydiv.style.backgroundRepeat = 'no-repeat';
@@ -208,7 +295,7 @@ function displayBackdrop(type, path) {
 async function displayMovieDetail() {
 	const movieId = window.location.search.split('=')[1];
 	const movie = await fetchTmbdData(`movie/${movieId}`);
-	console.log(movie.backdrop_path);
+
 	displayBackdrop('movie', movie.backdrop_path);
 	const div = document.createElement('div');
 	const image = movie.poster_path
@@ -269,7 +356,7 @@ async function displayMovieDetail() {
 async function displayTVShowDetail() {
 	const tvId = window.location.search.split('=')[1];
 	const tvShow = await fetchTmbdData(`tv/${tvId}`);
-	console.log(tvShow);
+
 	displayBackdrop('Show', tvShow.backdrop_path);
 	const div = document.createElement('div');
 	const image = tvShow.poster_path
